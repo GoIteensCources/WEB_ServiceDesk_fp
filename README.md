@@ -33,3 +33,9 @@
 ```bash
 alembic upgrade head
 ```
+
+
+### Додавання тестових данних:
+```
+python3 mock_data.py
+```

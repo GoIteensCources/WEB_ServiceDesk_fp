@@ -21,60 +21,113 @@ class RepairRequest(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     photo_url: Mapped[str] = mapped_column(String(255), nullable=True)
-    status: Mapped[RequestStatus] = mapped_column(SQLEnum(RequestStatus), default=RequestStatus.NEW, nullable=False)
+    status: Mapped[RequestStatus] = mapped_column(
+        SQLEnum(RequestStatus), default=RequestStatus.NEW, nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=func.now(), onupdate=func.now()
+    )
 
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    admin_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)    
-    
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
+    admin_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=True)
 
+    # Зв'язок з User (той, хто створив заявку)
+    user: Mapped["User"] = relationship(
+        "User",
+        back_populates="repair_requests",
+        foreign_keys=[user_id],
+        lazy="selectin",
+    )
 
-    user: Mapped["User"] = relationship(back_populates="repair_requests", foreign_keys=[user_id], lazy="selectin")
-    admin: Mapped["User"] = relationship(back_populates="assigned_repair_requests", foreign_keys=[admin_id], lazy="selectin")
-    
-    admin_messages: Mapped[list["AdminMessage"]] = relationship(back_populates="repair_request", lazy="selectin")
-    service_records: Mapped["ServiceRecord"] = relationship(back_populates="repair_request", lazy="selectin")
+    # Зв'язок з User (адмін, який взяв у роботу)
+    admin: Mapped["User"] = relationship(
+        "User",
+        back_populates="assigned_repair_requests",
+        foreign_keys=[admin_id],
+        lazy="selectin",
+    )
+
+    # Список повідомлень
+    messages: Mapped[list["AdminMessage"]] = relationship(
+        "AdminMessage",
+        back_populates="to_repair_request",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
+
+    # Список сервісних записів (може бути кілька)
+    service_records: Mapped["ServiceRecord"] = relationship(
+        "ServiceRecord",
+        back_populates="to_repair_request",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
 
     def __str__(self):
         return f"<RepairRequest {self.id} - {self.status}>"
 
 
-
-# Модель Note
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(50), nullable=False)
     email: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    password: Mapped[str] = mapped_column(String(100), nullable=False)  # Зберігаємо хеш пароля
+    password: Mapped[str] = mapped_column(String(254), nullable=False)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    repair_requests: Mapped[list["RepairRequest"]] = relationship(back_populates="user", lazy="selectin")
-    assigned_repair_requests: Mapped[list["RepairRequest"]] = relationship(back_populates="admin")
-    
-    admin_messages: Mapped[list["AdminMessage"]] = relationship(back_populates="admin")
+    # Заявки, створені користувачем
+    repair_requests: Mapped[list["RepairRequest"]] = relationship(
+        "RepairRequest",
+        back_populates="user",
+        foreign_keys="[RepairRequest.user_id]",
+        lazy="selectin",
+    )
+
+    # Заявки, які закріплені за адміном
+    assigned_repair_requests: Mapped[list["RepairRequest"]] = relationship(
+        "RepairRequest",
+        back_populates="admin",
+        foreign_keys="[RepairRequest.admin_id]",
+        lazy="selectin",
+    )
+
+    # Повідомлення, створені адміном
+    admin_messages: Mapped[list["AdminMessage"]] = relationship(
+        "AdminMessage",
+        back_populates="admin",
+        cascade="all, delete-orphan"
+    )
 
     def __str__(self):
         if self.is_admin:
-            return f"<Admin> з {self.id} та {self.username}"
-        return f"<User> з {self.id} та {self.username}. "
+            return f"<Admin> {self.id} - {self.username}"
+        return f"<User> {self.id} - {self.username}"
 
 
 class AdminMessage(Base):
     __tablename__ = "admin_messages"
 
-    id: Mapped[int] = mapped_column(primary_key=True, index= True)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
     message: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=func.now()
+    )
 
-    request_id:Mapped[int] = mapped_column( ForeignKey("repair_requests.id"), nullable=False)
+    request_id: Mapped[int] = mapped_column(ForeignKey("repair_requests.id"), nullable=False)
     admin_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
 
     # зв’язки
-    repair_request = relationship("RepairRequest", backref="admin_messages")
-    admin = relationship("User", backref="admin_messages")
+    to_repair_request: Mapped["RepairRequest"] = relationship(
+        "RepairRequest", back_populates="messages"
+    )
+    admin: Mapped["User"] = relationship(
+        "User", back_populates="admin_messages"
+    )
 
 
 class ServiceRecord(Base):
@@ -84,10 +137,15 @@ class ServiceRecord(Base):
     pay: Mapped[str] = mapped_column(String(50), nullable=False)
     parts_used: Mapped[str] = mapped_column(Text, nullable=True)
     warranty_info: Mapped[str] = mapped_column(Text, nullable=False)
-    data_completed: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=func.now())
+    data_completed: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=func.now()
+    )
 
     request_id: Mapped[int] = mapped_column(ForeignKey("repair_requests.id"), nullable=False)
-    repair_request = relationship("RepairRequest", backref="service_records")
+
+    to_repair_request: Mapped["RepairRequest"] = relationship(
+        "RepairRequest", back_populates="service_records"
+    )
 
     def __str__(self):
-        return f"<ServiceRecord> з {self.id} та {self.pay}"
+        return f"<ServiceRecord {self.id} - {self.pay}>"

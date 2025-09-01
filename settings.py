@@ -16,6 +16,7 @@ class DatabaseConfig:
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 5
     SECRET_KEY = os.getenv("SECRET_KEY")
+    STATIC_FILES_DIR = "./static/images"
 
     def uri_postgres(self):
         return f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}@localhost:5432/{self.DATABASE_NAME}"

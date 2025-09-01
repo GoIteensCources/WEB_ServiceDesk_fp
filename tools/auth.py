@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta, timezone
+from typing import Optional
 
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
@@ -11,7 +12,7 @@ from models.models import User
 from settings import api_config, async_session
 from fastapi import status
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 
 credentials_exception = HTTPException(
@@ -73,10 +74,20 @@ async def authenticate_user(username: str, password: str):
         return user
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    user = decode_access_token(token)
-    if not user:
+async def get_user_by_id(user_id: Optional[int]) -> Optional[User]:
+    async with async_session() as session:
+        user_stmt = select(User).where(User.id == user_id)
+        user = await session.execute(user_stmt)
+        return user.scalar_one_or_none()
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    user_token = decode_access_token(token)
+    if not user_token:
         raise credentials_exception
+    
+    user = await get_user_by_id(user_id = user_token.get("sub"))
+
     return user
 
 
