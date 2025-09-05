@@ -34,7 +34,8 @@ async def create_repair_request(
     # Створюємо новий запис у БД
     new_request = RepairRequest(
         description=description,
-        photos=",".join(saved_photos) if saved_photos else None
+        photo_url=",".join(saved_photos) if saved_photos else None,
+        user_id = current_user.id
     )
     db.add(new_request)
     await db.commit()
@@ -57,15 +58,19 @@ async def update_repair_request(
         .where(RepairRequest.user_id == current_user.id)
     )
     repair_request = result.scalar_one_or_none()
+    
     if not repair_request:
         return repair_request
+    
+    if not repair_request.user_id == current_user.id: 
+        raise HTTPException(status_code=403, detail="Not for your")
     
     if request_data.description:
         repair_request.description = request_data.description
 
-    if request_data.photo_url:
-        # TODO видаляємо старе фото і зберігаємо нову
-        repair_request.photo_url = request_data.photo_url
+    # if request_data.photo_url:
+    #     # TODO видаляємо старе фото і зберігаємо нову
+    #     repair_request.photo_url = request_data.photo_url
 
     await db.commit()
     await db.refresh(repair_request)
@@ -82,7 +87,8 @@ async def delete_repair_request(request_id: int,
     result = await db.scalar(sw)
     if not result:
         raise HTTPException(status_code=404, detail="Request not found")
-    if result.user_id == current_user.get("sub"): # type: ignore    
+    
+    if result.user_id == current_user.id:    
         await db.delete(result)
         await db.commit()
 

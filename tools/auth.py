@@ -85,8 +85,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     user_token = decode_access_token(token)
     if not user_token:
         raise credentials_exception
-    
-    user = await get_user_by_id(user_id = user_token.get("sub"))
+    user = await get_user_by_id(user_id = int(user_token.get("sub")))
 
     return user
 
