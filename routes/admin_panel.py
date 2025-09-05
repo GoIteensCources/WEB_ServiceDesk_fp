@@ -1,16 +1,64 @@
-from fastapi import Depends, APIRouter, Query
+from fastapi import Depends, APIRouter, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import select
 
-from models.models import User
+from models.models import RepairRequest, RequestStatus, User
+from schemas.admin_panel import RequestStatusUpdate
+from schemas.repairs import RepairRequestFull, RepairRequestOut
 from schemas.user import UserBase, UserOut
 from settings import get_db
-from tools.auth import  get_current_user, require_admin
+from tools.auth import get_current_user, require_admin
 from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter()    
 
+router = APIRouter(prefix="/admin")
 
 
 @router.get("/user/admin/me")
 async def only_for_admin(current_user_admin: User = Depends(require_admin)):
     return {"is admin": current_user_admin}
+
+
+@router.put("/{repair_id}/change/status", response_model=RepairRequestOut)
+async def change_request_status(
+    repair_id: int,
+    status_update: RequestStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user_admin: User = Depends(require_admin),
+):
+    stmt = select(RepairRequest).filter(RepairRequest.id == repair_id)
+    request = await db.scalar(stmt)
+
+    if not request:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Request not found"
+        )
+
+    breakpoint()
+    if (
+        request.status == RequestStatus.NEW
+        and status_update.new_status == RequestStatus.IN_PROGRESS
+    ):
+        request.admin_id = current_user_admin.id
+
+    request.status = status_update.new_status
+    await db.commit()
+    await db.refresh(request)
+
+    return request
+
+
+@router.get("/repairs", response_model=list[RepairRequestOut])
+async def get_all_requests_status_new(
+    new: bool = Query(True),
+    db: AsyncSession = Depends(get_db),
+    current_user_admin: User = Depends(require_admin),
+):
+
+    stmt = select(RepairRequest)
+    if new:
+        stmt = stmt.where(RepairRequest.status == RequestStatus.NEW)
+
+    result = await db.scalars(stmt)
+    requests = result.all()
+    return requests

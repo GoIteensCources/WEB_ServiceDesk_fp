@@ -39,20 +39,18 @@ async def insert_data():
         await session.refresh(u2)
         await session.refresh(u3)
 
-
         rec1 = RepairRequest(
             description="Зламався екран",
             photo_url=None,
             status=RequestStatus.NEW,
             user_id=u3.id,
-
         )
         rec2 = RepairRequest(
             description="Не працює кнопка",
             photo_url=None,
             status=RequestStatus.NEW,
             user_id=u2.id,
-            admin_id=u1.id
+            admin_id=u1.id,
         )
 
         rec3 = RepairRequest(
@@ -60,14 +58,13 @@ async def insert_data():
             photo_url=None,
             status=RequestStatus.COMPLETED,
             user_id=u2.id,
-            admin_id=u1.id
+            admin_id=u1.id,
         )
 
         session.add_all([rec1, rec2, rec3])
         await session.flush()
         await session.refresh(rec3)
 
-        
         sr1 = ServiceRecord(
             pay="50$",
             parts_used="кнопка, расходні матеріали",

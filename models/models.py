@@ -1,7 +1,15 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func, Enum as SQLEnum
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    String,
+    Text,
+    func,
+    Enum as SQLEnum,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from settings import Base
@@ -23,6 +31,9 @@ class RepairRequest(Base):
     photo_url: Mapped[str] = mapped_column(String(255), nullable=True)
     status: Mapped[RequestStatus] = mapped_column(
         SQLEnum(RequestStatus), default=RequestStatus.NEW, nullable=False
+    )
+    desired_deadline: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     created_at: Mapped[datetime] = mapped_column(
@@ -56,7 +67,7 @@ class RepairRequest(Base):
         "AdminMessage",
         back_populates="to_repair_request",
         cascade="all, delete-orphan",
-        lazy="selectin"
+        lazy="selectin",
     )
 
     # Список сервісних записів (може бути кілька)
@@ -64,7 +75,7 @@ class RepairRequest(Base):
         "ServiceRecord",
         back_populates="to_repair_request",
         cascade="all, delete-orphan",
-        lazy="selectin"
+        lazy="selectin",
     )
 
     def __str__(self):
@@ -98,9 +109,7 @@ class User(Base):
 
     # Повідомлення, створені адміном
     admin_messages: Mapped[list["AdminMessage"]] = relationship(
-        "AdminMessage",
-        back_populates="admin",
-        cascade="all, delete-orphan"
+        "AdminMessage", back_populates="admin", cascade="all, delete-orphan"
     )
 
     def __str__(self):
@@ -118,7 +127,9 @@ class AdminMessage(Base):
         DateTime(timezone=True), default=func.now()
     )
 
-    request_id: Mapped[int] = mapped_column(ForeignKey("repair_requests.id"), nullable=False)
+    request_id: Mapped[int] = mapped_column(
+        ForeignKey("repair_requests.id"), nullable=False
+    )
     admin_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
 
     # зв’язки
@@ -126,7 +137,7 @@ class AdminMessage(Base):
         "RepairRequest", back_populates="messages"
     )
     admin: Mapped["User"] = relationship(
-        "User", back_populates="admin_messages"
+        "User", back_populates="admin_messages", lazy="selectin"
     )
 
 
@@ -141,7 +152,9 @@ class ServiceRecord(Base):
         DateTime(timezone=True), default=func.now()
     )
 
-    request_id: Mapped[int] = mapped_column(ForeignKey("repair_requests.id"), nullable=False)
+    request_id: Mapped[int] = mapped_column(
+        ForeignKey("repair_requests.id"), nullable=False
+    )
 
     to_repair_request: Mapped["RepairRequest"] = relationship(
         "RepairRequest", back_populates="service_records"

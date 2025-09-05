@@ -21,6 +21,7 @@ credentials_exception = HTTPException(
     headers={"Authorization": "Bearer"},
 )
 
+
 # openssl rand -hex 32
 def generate_secret_key():
     return os.urandom(32).hex()
@@ -85,13 +86,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     user_token = decode_access_token(token)
     if not user_token:
         raise credentials_exception
-    user = await get_user_by_id(user_id = int(user_token.get("sub")))
+    user = await get_user_by_id(user_id=int(user_token.get("sub")))
 
     return user
 
 
-def require_admin(user: dict = Depends(get_current_user)):
-    if not user["is_admin"]:
+def require_admin(user: User = Depends(get_current_user)):
+    if not user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Invalid credentials"
         )

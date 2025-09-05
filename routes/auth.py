@@ -22,7 +22,6 @@ async def generate_token(form_data: OAuth2PasswordRequestForm = Depends()):
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-
 @router.post("/register", response_model=UserOut)
 async def create_user(user: UserBase, db: AsyncSession = Depends(get_db)):
     new_user = User(**user.model_dump())

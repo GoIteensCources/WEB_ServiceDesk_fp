@@ -1,25 +1,41 @@
-from fastapi import Depends, APIRouter, File, Form, HTTPException, Query, UploadFile
+from datetime import datetime
+from fastapi import (
+    Body,
+    Depends,
+    APIRouter,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+)
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 
 from models.models import RepairRequest, User
-from schemas.repairs import RepairRequestFull, RepairRequestOut, RepairRequestUpdate
+from schemas.repairs import (
+    AdminMessageOut,
+    RepairRequestFull,
+    RepairRequestOut,
+    RepairRequestUpdate,
+)
 from schemas.user import UserBase, UserOut
 from settings import get_db, api_config
-from tools.auth import  get_current_user, require_admin
+from tools.auth import get_current_user, require_admin
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tools.file_upload import save_upload_file
 
-router = APIRouter(prefix="/account")    
+router = APIRouter(prefix="/account")
 
 
 @router.post("/create_repair_request", response_model=RepairRequestOut)
 async def create_repair_request(
     description: str = Form(...),
-    photos: list[UploadFile] = File(None),   # кілька фото
+    photos: list[UploadFile] = File(None),  # кілька фото
+    desired_deadline: datetime = Body(None, examples=[datetime.now()]),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
 
     saved_photos = []
@@ -27,7 +43,9 @@ async def create_repair_request(
     if photos:
         # асинхронно зберігаємо кожен файл
         for photo in photos:
-            saved_path = await save_upload_file(photo, dest_dir=api_config.STATIC_FILES_DIR)
+            saved_path = await save_upload_file(
+                photo, dest_dir=api_config.STATIC_FILES_DIR
+            )
             if saved_path:
                 saved_photos.append(saved_path)
 
@@ -35,7 +53,8 @@ async def create_repair_request(
     new_request = RepairRequest(
         description=description,
         photo_url=",".join(saved_photos) if saved_photos else None,
-        user_id = current_user.id
+        user_id=current_user.id,
+        desired_deadline=desired_deadline,
     )
     db.add(new_request)
     await db.commit()
@@ -44,22 +63,37 @@ async def create_repair_request(
     return new_request
 
 
-# TODO
-
 @router.get("/repair_request/{request_id}", response_model=RepairRequestFull)
 async def get_repair_request(
-        request_id: int,
-        current_user: User = Depends(get_current_user),
-        db: AsyncSession = Depends(get_db)
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    pass
 
+    result = await db.execute(
+        select(RepairRequest).where(RepairRequest.id == request_id)
+    )
+    repair_request = result.scalar()
 
+    if not repair_request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    if repair_request.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Заявка не ваша")
+
+    # data_out = RepairRequestFull(
+    #     id = repair_request.id,
+    #     description = repair_request.description,
+    #     admin_message = AdminMessageOut(message = repair_request.messages.message)
+
+    # )
+    return repair_request
 
 
 @router.get("/repair_requests/my", response_model=list[RepairRequestOut])
-async def get_all_requests(db: AsyncSession = Depends(get_db),
-                           current_user:User = Depends(get_current_user)):
+async def get_all_requests(
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     s = select(RepairRequest).where(RepairRequest.user_id == current_user.id)
     result = await db.scalars(s)
     requests = result.all()
@@ -68,10 +102,10 @@ async def get_all_requests(db: AsyncSession = Depends(get_db),
 
 @router.patch("/repair_request/{request_id}", response_model=RepairRequestOut)
 async def update_repair_request(
-        request_id: int,
-        request_data: RepairRequestUpdate,
-        current_user: User = Depends(get_current_user),
-        db: AsyncSession = Depends(get_db)
+    request_id: int,
+    request_data: RepairRequestUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
 
     result = await db.execute(
@@ -80,13 +114,13 @@ async def update_repair_request(
         .where(RepairRequest.user_id == current_user.id)
     )
     repair_request = result.scalar_one_or_none()
-    
+
     if not repair_request:
         return repair_request
-    
-    if not repair_request.user_id == current_user.id: 
+
+    if not repair_request.user_id == current_user.id:
         raise HTTPException(status_code=403, detail="Not for your")
-    
+
     if request_data.description:
         repair_request.description = request_data.description
 
@@ -101,17 +135,19 @@ async def update_repair_request(
 
 
 @router.delete("/repair_request/{request_id}", status_code=204)
-async def delete_repair_request(request_id: int, 
-                                db: AsyncSession = Depends(get_db),
-                                current_user: User = Depends(get_current_user)):
-    
+async def delete_repair_request(
+    request_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+
     # TODO not delete, change status to CANCELLED
-    
+
     sw = select(RepairRequest).where(RepairRequest.id == request_id)
     result = await db.scalar(sw)
     if not result:
         raise HTTPException(status_code=404, detail="Request not found")
-    
-    if result.user_id == current_user.id:    
+
+    if result.user_id == current_user.id:
         await db.delete(result)
         await db.commit()

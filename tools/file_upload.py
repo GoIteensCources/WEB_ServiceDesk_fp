@@ -1,4 +1,3 @@
-
 import os
 from typing import Optional
 import uuid
@@ -7,11 +6,13 @@ from settings import api_config
 import aiofiles
 
 
-async def save_upload_file(file: UploadFile, dest_dir: str = api_config.STATIC_FILES_DIR) -> Optional[str]:
+async def save_upload_file(
+    file: UploadFile, dest_dir: str = api_config.STATIC_FILES_DIR
+) -> Optional[str]:
 
     if not file:
         return None
-    
+
     if file.filename:
         filename = f"{uuid.uuid4().hex}_{file.filename}"
         os.makedirs(dest_dir, exist_ok=True)
