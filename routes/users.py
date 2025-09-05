@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 
 from models.models import RepairRequest, User
-from schemas.repairs import RepairRequestOut, RepairRequestUpdate
+from schemas.repairs import RepairRequestFull, RepairRequestOut, RepairRequestUpdate
 from schemas.user import UserBase, UserOut
 from settings import get_db, api_config
 from tools.auth import  get_current_user, require_admin
@@ -44,6 +44,28 @@ async def create_repair_request(
     return new_request
 
 
+# TODO
+
+@router.get("/repair_request/{request_id}", response_model=RepairRequestFull)
+async def get_repair_request(
+        request_id: int,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db)
+):
+    pass
+
+
+
+
+@router.get("/repair_requests/my", response_model=list[RepairRequestOut])
+async def get_all_requests(db: AsyncSession = Depends(get_db),
+                           current_user:User = Depends(get_current_user)):
+    s = select(RepairRequest).where(RepairRequest.user_id == current_user.id)
+    result = await db.scalars(s)
+    requests = result.all()
+    return requests
+
+
 @router.patch("/repair_request/{request_id}", response_model=RepairRequestOut)
 async def update_repair_request(
         request_id: int,
@@ -78,11 +100,13 @@ async def update_repair_request(
     return repair_request
 
 
-
 @router.delete("/repair_request/{request_id}", status_code=204)
 async def delete_repair_request(request_id: int, 
                                 db: AsyncSession = Depends(get_db),
                                 current_user: User = Depends(get_current_user)):
+    
+    # TODO not delete, change status to CANCELLED
+    
     sw = select(RepairRequest).where(RepairRequest.id == request_id)
     result = await db.scalar(sw)
     if not result:
@@ -91,6 +115,3 @@ async def delete_repair_request(request_id: int,
     if result.user_id == current_user.id:    
         await db.delete(result)
         await db.commit()
-
-
-    

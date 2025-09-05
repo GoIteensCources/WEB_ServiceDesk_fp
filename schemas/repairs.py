@@ -21,3 +21,25 @@ class RepairRequestOut(BaseModel):
     user_id: int
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AdminMessageOut(BaseModel):
+    message: str
+    created_at: datetime
+
+    admin_id: int
+    admin_name: str
+
+
+class ServiceRecordOut(BaseModel):
+    pay: str
+    parts_used:str
+    warranty_info: str
+    data_completed: datetime
+
+
+
+class RepairRequestFull(RepairRequestOut):
+
+    admin_message: Optional[AdminMessageOut] = None
+    service_record:Optional[ServiceRecordOut] = None
