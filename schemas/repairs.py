@@ -45,3 +45,11 @@ class RepairRequestFull(RepairRequestOut):
 
     messages: Optional[list[AdminMessageOut]] = []
     service_records: Optional[ServiceRecordOut] = None
+
+
+class ServiceRecordCreate(BaseModel):
+    pay: str
+    parts_used: Optional[str] = None
+    warranty_info: str
+
+    model_config = ConfigDict(from_attributes=True)

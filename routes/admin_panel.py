@@ -1,13 +1,12 @@
 from fastapi import Depends, APIRouter, HTTPException, Query, status
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 
-from models.models import AdminMessage, RepairRequest, RequestStatus, User
+from models.models import AdminMessage, RepairRequest, RequestStatus, ServiceRecord, User
 from schemas.admin_panel import RequestStatusUpdate
-from schemas.repairs import AdminMessageIn, AdminMessageOut, RepairRequestFull, RepairRequestOut
-from schemas.user import UserBase, UserOut
+from schemas.repairs import AdminMessageIn, AdminMessageOut, RepairRequestOut, ServiceRecordCreate
+
 from settings import get_db
-from tools.auth import get_current_user, require_admin
+from tools.auth import  require_admin
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -100,3 +99,34 @@ async def create_admin_message(
     await db.refresh(admin_message)
 
     return admin_message
+
+
+@router.post("/repair/{repair_id}/change/service_garanty", response_model=RepairRequestOut)
+async def create_service_record_with_garanty(
+        repair_id: int,
+        service_data: ServiceRecordCreate,
+        db: AsyncSession = Depends(get_db),
+        current_admin: User = Depends(require_admin),
+):
+   
+    stmt = select(RepairRequest).filter(RepairRequest.id == repair_id)
+    request = await db.scalar(stmt)
+
+    if not request:
+        raise HTTPException(status_code = 404, detail="Не знайдено")
+
+
+    new_service = ServiceRecord(
+        pay=service_data.pay,
+        parts_used=service_data.parts_used,
+        warranty_info=service_data.warranty_info,
+        request_id=repair_id
+    )
+
+    db.add(new_service)
+    request.status = RequestStatus.COMPLETED
+
+    await db.commit()
+    await db.refresh(request)
+
+    return request
