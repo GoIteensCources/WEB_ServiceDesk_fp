@@ -2,9 +2,9 @@ from fastapi import Depends, APIRouter, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
 
-from models.models import RepairRequest, RequestStatus, User
+from models.models import AdminMessage, RepairRequest, RequestStatus, User
 from schemas.admin_panel import RequestStatusUpdate
-from schemas.repairs import RepairRequestFull, RepairRequestOut
+from schemas.repairs import AdminMessageIn, AdminMessageOut, RepairRequestFull, RepairRequestOut
 from schemas.user import UserBase, UserOut
 from settings import get_db
 from tools.auth import get_current_user, require_admin
@@ -80,3 +80,23 @@ async def get_all_requests_status_cmi(
     result = await db.scalars(stmt)
     requests = result.all()
     return requests
+
+
+@router.post("/admin/repair/{repair_id}/change/comment", response_model=AdminMessageOut)
+async def create_admin_message(
+    repair_id: int,
+    message: AdminMessageIn,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    admin_message = AdminMessage(
+        message=message.message,
+        request_id=repair_id,
+        admin_id=current_admin.id,
+)
+
+    db.add(admin_message)
+    await db.commit()
+    await db.refresh(admin_message)
+
+    return admin_message

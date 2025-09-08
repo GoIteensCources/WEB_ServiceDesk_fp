@@ -26,8 +26,13 @@ class AdminMessageOut(BaseModel):
     created_at: datetime
 
     admin_id: int
+    request_id: int
     # admin_name: UserBase
 
+
+
+class AdminMessageIn(BaseModel):
+    message: str
 
 class ServiceRecordOut(BaseModel):
     pay: str
