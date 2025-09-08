@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import date
 from models import RequestStatus  # 🔥 імпортуємо enum
 
@@ -8,6 +8,8 @@ class RequestBase(BaseModel):
     description: str | None = None
     desired_deadline: date | None = None
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class RequestCreate(RequestBase):
     pass
@@ -16,9 +18,6 @@ class RequestCreate(RequestBase):
 class RequestResponse(RequestBase):
     id: int
     status: RequestStatus
-
-    class Config:
-        orm_mode = True
 
 
 class RequestStatusUpdate(BaseModel):

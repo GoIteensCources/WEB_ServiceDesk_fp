@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 import jwt
 from sqlalchemy import select
@@ -82,7 +82,7 @@ async def get_user_by_id(user_id: Optional[int]) -> Optional[User]:
         return user.scalar_one_or_none()
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(request: Request, token: str = Depends(oauth2_scheme)):   
     user_token = decode_access_token(token)
     if not user_token:
         raise credentials_exception

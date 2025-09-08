@@ -1,4 +1,6 @@
 from datetime import datetime
+from logging import config
+import os
 from fastapi import (
     Body,
     Depends,
@@ -14,14 +16,13 @@ from sqlalchemy import select
 
 from models.models import RepairRequest, User
 from schemas.repairs import (
-    AdminMessageOut,
     RepairRequestFull,
     RepairRequestOut,
-    RepairRequestUpdate,
+
 )
-from schemas.user import UserBase, UserOut
+
 from settings import get_db, api_config
-from tools.auth import get_current_user, require_admin
+from tools.auth import get_current_user
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tools.file_upload import save_upload_file
@@ -71,22 +72,14 @@ async def get_repair_request(
 ):
 
     result = await db.execute(
-        select(RepairRequest).where(RepairRequest.id == request_id)
+        select(RepairRequest).where(RepairRequest.id == request_id,
+                                    RepairRequest.user_id ==current_user.id)
     )
     repair_request = result.scalar()
 
     if not repair_request:
         raise HTTPException(status_code=404, detail="Request not found")
 
-    if repair_request.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Заявка не ваша")
-
-    # data_out = RepairRequestFull(
-    #     id = repair_request.id,
-    #     description = repair_request.description,
-    #     admin_message = AdminMessageOut(message = repair_request.messages.message)
-
-    # )
     return repair_request
 
 
@@ -103,30 +96,51 @@ async def get_all_requests(
 @router.patch("/repair_request/{request_id}", response_model=RepairRequestOut)
 async def update_repair_request(
     request_id: int,
-    request_data: RepairRequestUpdate,
+    photos: list[UploadFile] = File(None),
+    description: str | None = Form(None),
+    desired_deadline: str | None = Form(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
 
     result = await db.execute(
         select(RepairRequest)
-        .where(RepairRequest.id == request_id)
-        .where(RepairRequest.user_id == current_user.id)
+        .where(RepairRequest.id == request_id, 
+               RepairRequest.user_id == current_user.id)
     )
     repair_request = result.scalar_one_or_none()
 
     if not repair_request:
-        return repair_request
+        raise HTTPException(status_code=404, detail="Request not found")
 
-    if not repair_request.user_id == current_user.id:
-        raise HTTPException(status_code=403, detail="Not for your")
+    if description:
+        repair_request.description = description
+    
+    if desired_deadline:
+        repair_request.desired_deadline = datetime.fromisoformat(desired_deadline)
 
-    if request_data.description:
-        repair_request.description = request_data.description
+    if photos:
+        # 1) видаляємо старі фото
+        if repair_request.photo_url:
+            for old_path in repair_request.photo_url.split(","):
+                if os.path.exists(old_path):
+                    os.remove(old_path)
 
-    # if request_data.photo_url:
-    #     # TODO видаляємо старе фото і зберігаємо нову
-    #     repair_request.photo_url = request_data.photo_url
+        # 2) створюємо директорію для фото
+        save_dir = os.path.join(api_config.STATIC_FILES_DIR, str(request_id))
+        os.makedirs(save_dir, exist_ok=True)
+
+        # 3) зберігаємо нові фото
+        new_paths = []
+        for photo in photos:
+            saved_path = await save_upload_file(
+                photo, dest_dir=api_config.STATIC_FILES_DIR
+            )
+            if saved_path:
+                new_paths.append(saved_path)
+
+        # 4) оновлюємо модель
+        repair_request.photo_url = ",".join(new_paths)
 
     await db.commit()
     await db.refresh(repair_request)
@@ -140,11 +154,9 @@ async def delete_repair_request(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-
-    # TODO not delete, change status to CANCELLED
-
     sw = select(RepairRequest).where(RepairRequest.id == request_id)
     result = await db.scalar(sw)
+    
     if not result:
         raise HTTPException(status_code=404, detail="Request not found")
 

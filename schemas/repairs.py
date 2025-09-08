@@ -6,12 +6,6 @@ from models.models import RequestStatus
 from schemas.user import UserBase
 
 
-class RepairRequestUpdate(BaseModel):
-    description: Optional[str] = None
-    photo_url: Optional[FilePath] = None
-    desired_deadline: Optional[datetime] = None
-
-
 class RepairRequestOut(BaseModel):
     id: int
     description: str
@@ -32,7 +26,7 @@ class AdminMessageOut(BaseModel):
     created_at: datetime
 
     admin_id: int
-    admin_name: UserBase
+    # admin_name: UserBase
 
 
 class ServiceRecordOut(BaseModel):
@@ -44,5 +38,5 @@ class ServiceRecordOut(BaseModel):
 
 class RepairRequestFull(RepairRequestOut):
 
-    admin_message: Optional[AdminMessageOut] = None
-    service_record: Optional[ServiceRecordOut] = None
+    messages: Optional[list[AdminMessageOut]] = []
+    service_records: Optional[ServiceRecordOut] = None

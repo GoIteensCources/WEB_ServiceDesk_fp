@@ -3,7 +3,7 @@ import asyncio
 from werkzeug.security import generate_password_hash
 
 from models import User
-from models.models import RepairRequest, RequestStatus, ServiceRecord
+from models.models import AdminMessage, RepairRequest, RequestStatus, ServiceRecord
 from settings import Base, api_config, async_engine, async_session
 
 
@@ -56,7 +56,7 @@ async def insert_data():
         rec3 = RepairRequest(
             description="Не працює кнопка",
             photo_url=None,
-            status=RequestStatus.COMPLETED,
+            status=RequestStatus.IN_PROGRESS,
             user_id=u2.id,
             admin_id=u1.id,
         )
@@ -71,7 +71,11 @@ async def insert_data():
             warranty_info="2 years",
             request_id=rec3.id,
         )
-        session.add(sr1)
+
+        mess_3 = AdminMessage(message="необхідне уточнення про поломку",
+                              request_id = rec3.id,
+                              admin_id = u1.id)
+        session.add_all([sr1, mess_3])
         await session.commit()
 
 

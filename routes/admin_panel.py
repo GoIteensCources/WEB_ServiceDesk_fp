@@ -34,7 +34,6 @@ async def change_request_status(
             status_code=status.HTTP_404_NOT_FOUND, detail="Request not found"
         )
 
-    breakpoint()
     if (
         request.status == RequestStatus.NEW
         and status_update.new_status == RequestStatus.IN_PROGRESS
@@ -58,6 +57,25 @@ async def get_all_requests_status_new(
     stmt = select(RepairRequest)
     if new:
         stmt = stmt.where(RepairRequest.status == RequestStatus.NEW)
+
+    result = await db.scalars(stmt)
+    requests = result.all()
+    return requests
+
+
+@router.get("/self/repairs", response_model=list[RepairRequestOut])
+async def get_all_requests_status_cmi(
+    active: bool = Query(True),
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+
+    stmt = select(RepairRequest).where(RepairRequest.admin_id == current_admin.id)
+    
+    if active:
+        stmt = stmt.filter(RepairRequest.status == RequestStatus.IN_PROGRESS or 
+                           RepairRequest.status == RequestStatus.MESSAGE)
+  
 
     result = await db.scalars(stmt)
     requests = result.all()
